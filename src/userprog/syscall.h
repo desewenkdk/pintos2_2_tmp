@@ -12,11 +12,14 @@ pid_t exec(const char *cmd_line);
 int wait(pid_t pid);
 int read(int fd, void *buffer, unsigned size);
 int write(int fd, const void *buffer, unsigned size);
-
 /*2_2 added userprog*/
 bool create(const char *file, unsigned initial_size);
 bool remove(const char *file);
-
+int open(const char *file);
+int filesize(int fd);
+void seek(int fd, unsigned position);
+unsigned tell(int fd);
+void close(int fd);
 
 //user defined system call functions;
 int fibonacci(int n);

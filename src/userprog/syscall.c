@@ -1,7 +1,8 @@
-#include "userprog/syscall.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <syscall-nr.h>
+#include <stdbool.h>
+#include "userprog/syscall.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -11,12 +12,27 @@
 #include "threads/palloc.h"
 #include "devices/input.h"
 #include "userprog/pagedir.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "filesys/off_t.h"
+#include "filesys/inode.h"
 
-static void syscall_handler (struct intr_frame *);
+static void syscall_handler(struct intr_frame*);
+static bool vaddr_valid_checker(void *p);
+struct file{
+	struct inode *inode;
+	off_t pos;
+	bool deny_write;
+};
+
+/*func for check bad stack pointer*/
+static bool vaddr_valid_checker(void *p){
+	return (!is_user_vaddr(p)  ||\
+	 (pagedir_get_page(thread_current()->pagedir, (p))  ==  NULL));
+}
 
 /*func in referrence*/
-static int
-get_user(const uint8_t *uaddr)
+static int get_user(const uint8_t *uaddr)
 {
 	int result;
 	asm("movl $1f, %0; movzbl %1, %0; 1:"
@@ -24,14 +40,12 @@ get_user(const uint8_t *uaddr)
 	return result;
 }
 
-void
-syscall_init (void) 
+void syscall_init(void) 
 {
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-static void
-syscall_handler (struct intr_frame *f UNUSED) 
+static void syscall_handler (struct intr_frame *f UNUSED) 
 {
     //printf ("system call handler-----------------------------------!\n");
 	uint32_t choose = 0;
@@ -43,7 +57,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 	bool user = 1;
 	user = (f->error_code & 0x4) != 0;
 	if (user == 0 || is_kernel_vaddr(f->esp))
-	  exit(-1);*/ 
+		exit(-1);*/ 
 
 
 	if (get_user((uint8_t *)(f->esp)) == -1) {
@@ -163,6 +177,64 @@ syscall_handler (struct intr_frame *f UNUSED)
 		int d = (int)*(uint32_t*)(f->esp + 16);
 		f->eax = sum_of_four_int(a,b,c,d);
 	}
+
+	else if(choose == SYS_CREATE){
+		//if true, then invalid esp.
+		if(vaddr_valid_checker(f->esp)){
+			exit(-1);
+		}
+		if(vaddr_valid_checker(f->esp+4)){
+			exit(-1);
+		}
+		if(vaddr_valid_checker(f->esp+8)){
+			exit(-1);
+		}
+		
+		f->eax = create((const char*)*(uint32_t*)(f->esp+4), (unsigned)*(uint32_t*)(f->esp+8));
+	}
+
+	else if(choose == SYS_REMOVE){
+		if(vaddr_valid_checker(f->esp)){
+			exit(-1);
+		}
+		f->eax = remove((const char*)*(uint32_t*)(f->esp + 4));
+	}
+
+	else if(choose == SYS_OPEN){
+		if(vaddr_valid_checker(f->esp))
+			exit(-1);
+		if(vaddr_valid_checker(f->esp + 4))
+			exit(-1);
+		f->eax = open((const char*)*(uint32_t*)(f->esp+4));
+	}
+
+	else if(choose == SYS_FILESIZE){
+		if(vaddr_valid_checker(f->esp) || vaddr_valid_checker(f->esp + 4)){
+			exit(-1);
+		}
+		f->eax = filesize((int)*(uint32_t*)(f->esp + 4));
+	}
+
+	else if(choose == SYS_SEEK){
+		if(vaddr_valid_checker(f->esp))exit(-1);
+		if(vaddr_valid_checker(f->esp + 4))exit(-1);
+		if(vaddr_valid_checker(f->esp + 8))exit(-1);
+		seek((int)*(uint32_t*)(f->esp + 4), (unsigned)*(uint32_t*)(f->esp + 8));
+	}
+	
+	else if(choose == SYS_TELL){
+		if(vaddr_valid_checker(f->esp))exit(-1);
+		if(vaddr_valid_checker(f->esp+4))exit(-1);
+		f->eax = tell((int)*(uint32_t*)(f->esp + 4));
+	}
+
+	else if(choose == SYS_CLOSE){
+		if(vaddr_valid_checker(f->esp))exit(-1);
+		if(vaddr_valid_checker(f->esp+4))exit(-1);
+		close((int)*(uint32_t*)(f->esp + 4));
+	}
+
+
 }
 void halt(void)
 {
@@ -186,7 +258,14 @@ void exit(int status)
 
 	/*Don't Erase this print!!!! it's necessary for test*/
 	printf("%s: exit(%d)\n", thread_name(), status);
+	
 
+	//close file when thread exits
+	int i;
+	for(i=3; i<131; i++){
+		if (thread_current()->files[i] != NULL)
+			close(i);
+	}
 	thread_exit();
 }
 
@@ -197,6 +276,13 @@ int read(int fd, void *buffer, unsigned size) {
 		for(i=0; i< size; i++)
 			*(uint8_t *) (buffer+i) = input_getc();
 		return size;
+	}
+	else if(fd > 2){
+		//return the number of bytes actually read, file.c
+		struct thread *cur = thread_current();
+		if(cur->files[fd] == NULL)
+			exit(-1);
+		return file_read(cur->files[fd], buffer, size);
 	}
 	else{
 		return -1;
@@ -222,8 +308,91 @@ int write(int fd, const void *buffer, unsigned size) {
 	//	printf("%u", *(uint8_t *)(buffer));
 		return size;
 	}
+
+	//check for access to NULL file pointer
+	struct thread *cur = thread_current();
+	if (cur->files[fd] == NULL)
+		exit(-1);
+	else if (fd > 2){
+		/*returns the number of bytes actually written, file.c*/
+		return file_write(thread_current()->files[fd],buffer,size);
+	}
 	return -1;
 }
+
+bool create(const char *file, unsigned initial_size){
+	if (file == NULL)
+		exit(-1);
+	return filesys_create(file, initial_size);
+}
+
+bool remove(const char *file){
+	if(file == NULL)
+		exit(-1);
+	return filesys_remove(file);
+}
+
+/*it must return "file descripter" value from created file -> index of files array*/
+int open(const char *file){
+	int i;
+	if (file == NULL)
+		exit(-1);
+
+	struct file *fileopen = filesys_open(file);
+	struct thread *cur_t = thread_current();
+
+	//file is not exist, return -1 
+	if (fileopen == NULL){
+		return -1;
+	}
+	//iteration start with fd = 3; fd 0,1,2 is already defined for (STDIN_FILENO) , (STDOUT_FILENO), STDERR.
+	for(i=3; i<131; i++){
+		if(cur_t->files[i] == NULL){
+			cur_t->files[i] = fileopen;
+			return i;
+		}
+	}
+	//something goes wrong.....
+	return -1;	 
+}
+
+int filesize(int fd){
+	struct thread *cur = thread_current();
+	if(cur->files[fd] == NULL)
+		exit(-1);
+	return file_length(cur->files[fd]);
+}
+
+void seek(int fd, unsigned position){
+	struct thread *cur = thread_current();
+	struct file *f_to_see = cur->files[fd];
+	if (cur -> files[fd] == NULL)
+		exit(-1);	
+	file_seek(f_to_see,position);
+}
+
+unsigned tell(int fd){
+	struct thread *cur = thread_current();
+    struct file *f_to_tell = cur->files[fd];
+	if (f_to_tell == NULL)
+		exit(-1);
+
+    file_tell(f_to_tell);
+}
+
+void close(int fd){
+	struct thread *cur = thread_current();
+	struct file *f_to_close = cur->files[fd];
+	if (f_to_close == NULL)
+		exit(-1);
+	
+	//before close your file, make sure to thread->files[fd] make NULL!! file_close can't do that.
+	else{
+		cur->files[fd] = NULL;
+		file_close(f_to_close);
+	}
+}
+
 
 int fibonacci(int n){
     int fibo1 = 1, fibo2=1, tmp;
