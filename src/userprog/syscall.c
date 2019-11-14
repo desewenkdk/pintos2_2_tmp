@@ -50,7 +50,6 @@ static void syscall_handler (struct intr_frame *f UNUSED)
     //printf ("system call handler-----------------------------------!\n");
 	uint32_t choose = 0;
 	choose = *(uint32_t *)(f->esp);
-
 	/*
 	check bad address at exception.c 
 
@@ -72,7 +71,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 	/*is any bad pointer passes here??*/
 	if ((!is_user_vaddr(f->esp)) || (pagedir_get_page(thread_current()->pagedir, (f->esp)) == NULL)) {
 	
-		//printf("\n\n\n*************is any bad pointer passes here??***************\n\n\n");
+//		printf("\n\n\n*************is any bad pointer passes here??***************\n\n\n");
 		exit(thread_current()->exit_status);
 	}
 	//for test case bad-ptr address in argument
@@ -83,7 +82,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 
 
 	//check esp pointer which points kernel or user : userprog/exception.c!!
-
+	printf("choose %d ------- %d\n", choose, SYS_EXEC);
 	if (choose == SYS_HALT) {
 		//printf("system handler-SYS_HALT");
 		halt();
@@ -96,18 +95,22 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 			exit(*(uint32_t*)(f->esp + 4));
 	}
 	else if (choose == SYS_EXEC) {
-		//printf("system handler-SYS_EXEC");
+		printf("system handler-SYS_EXEC");
 		//printf("\nSystem handler-SYS_EXEC---- argument:%p\n", *(uint32_t*)(f->esp + 4)); //�ּҰ��� �Ķ���ͷ� ���� �Լ��鿡 �����Ѵ�. esp�� ��ȿ���������� ����� �ּҰ��� invalid�� �� �ִ�.
-		if (!is_user_vaddr(f->esp + 4) || (pagedir_get_page(thread_current()->pagedir, (f->esp + 4)) == NULL))
+		if (!is_user_vaddr(f->esp + 4) || (pagedir_get_page(thread_current()->pagedir, (f->esp + 4)) == NULL)){
+			printf("111111111111111111111111111111\n");
 			exit(-1);
-
+		}
 		//for test case exec-bad-ptr -> ���ʿ��ѵ�.
 		else if (!is_user_vaddr(*(uint32_t*)(f->esp + 4)) || (pagedir_get_page(thread_current()->pagedir, (*(uint32_t*)(f->esp + 4))) == NULL)) {
 			//printf("\nToo low address for argument\n");
+			printf("222222222222222222222222222222\n");
 			exit(-1);
 		}
-		else
-		f->eax = exec((const char*)*(uint32_t*)(f->esp + 4));
+		else{
+			printf("33333333333333333333333333333333\n");
+			f->eax = exec((const char*)*(uint32_t*)(f->esp + 4));
+		}
 	}
 	else if (choose == SYS_WAIT) {
 		//printf("\nsystem handler-SYS_WAIT: %d, %s\n",*(uint32_t *)(f->esp + 4), thread_current()->name);
@@ -248,6 +251,7 @@ void halt(void)
 
 pid_t exec(const char *cmd_line)
 {
+	printf("\\\\%s\n",cmd_line);
 	return process_execute(cmd_line);
 }
 
@@ -306,6 +310,7 @@ int read(int fd, void *buffer, unsigned size) {
 
 int write(int fd, const void *buffer, unsigned size) {
 	int i;
+	//printf("1111111111111111111\n");
 	if (fd == 1) {
 	//for debug
 		//printf("in syscall-write : %d, 0X%p, %d\n", fd, buffer, size);
@@ -321,15 +326,18 @@ int write(int fd, const void *buffer, unsigned size) {
 		return size;
 	}
 
+	else if (fd > 2 && fd < 131){
 	//check for access to NULL file pointer
-	struct thread *cur = thread_current();
-	if (cur->files[fd] == NULL)
-		exit(-1);
-	else if (fd > 2){
+		struct thread *cur = thread_current();
+		if (cur->files[fd] == NULL){
+			//printf("??????????\n");
+			exit(-1);
+		}
+
 		int ret;
 		/*returns the number of bytes actually written, file.c*/
-		ret =  file_write(thread_current()->files[fd],buffer,size);
-		//printf("rox----------%d---------\n", ret);
+		ret =  file_write(cur->files[fd],buffer,size);
+		printf("rox----------%d---------\n", ret);
 		return ret;
 	}
 	return -1;
