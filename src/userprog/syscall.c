@@ -326,8 +326,11 @@ int write(int fd, const void *buffer, unsigned size) {
 	if (cur->files[fd] == NULL)
 		exit(-1);
 	else if (fd > 2){
+		int ret;
 		/*returns the number of bytes actually written, file.c*/
-		return file_write(thread_current()->files[fd],buffer,size);
+		ret =  file_write(thread_current()->files[fd],buffer,size);
+		//printf("rox----------%d---------\n", ret);
+		return ret;
 	}
 	return -1;
 }
@@ -361,6 +364,7 @@ int open(const char *file){
 	for(i=3; i<131; i++){
 		if(cur_t->files[i] == NULL){
 			cur_t->files[i] = fileopen;
+			file_deny_write(cur_t->files[i]);
 			return i;
 		}
 	}
@@ -400,6 +404,7 @@ void close(int fd){
 	
 	//before close your file, make sure to thread->files[fd] make NULL!! file_close can't do that.
 	else{
+		file_allow_write(cur->files[fd]);
 		cur->files[fd] = NULL;
 		file_close(f_to_close);
 	}
