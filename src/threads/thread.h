@@ -101,6 +101,10 @@ struct thread
 	struct list ls_child;
 	struct list_elem ls_child_elem;
 
+	//for file read/write
+	/*we have to define "file" structure because file structure is not defined in header, but in file.c file.*/
+	struct file *files[131]; // opens 128 files, except fd0,1,2(are already defined) 
+
 	//for synchronize
 	struct semaphore sema_lock;
 	struct semaphore sema_mem; // for keep in memory until child process is removed

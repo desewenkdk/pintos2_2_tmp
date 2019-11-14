@@ -483,9 +483,14 @@ init_thread (struct thread *t, const char *name, int priority)
   list_push_back (&all_list, &t->allelem);
   t->parent = running_thread();
 #ifdef USERPROG
+	int i;//initialize file structures to NULL
+	for(i=0; i<128; i++){
+		t->files[i] = NULL;
+	}
   sema_init(&(t->sema_lock), 0);
   sema_init(&(t->sema_mem), 0);
   //ls_child
+  
   list_init(&(t->ls_child));
   list_push_back(&(running_thread()->ls_child),&(t->ls_child_elem));
   // list_push_back(&(t->ls_child), &(t->ls_child_elem));

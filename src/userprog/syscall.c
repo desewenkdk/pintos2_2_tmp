@@ -118,17 +118,22 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 	}
 	else if (choose == SYS_READ) {
 		//printf("system handler-SYS_READ");
-		if (!is_user_vaddr(f->esp + 4))
+		if (vaddr_valid_checker(f->esp + 4))
 			exit(-1);
-		else if (!is_user_vaddr(f->esp + 8))
+		else if (vaddr_valid_checker(f->esp + 8))
 			exit(-1);
-		else if (!is_user_vaddr(f->esp + 12))
+		else if (vaddr_valid_checker(f->esp + 12))
 			exit(-1);
-
+		
+		//printf("---------왜 3??? ------ %d %x\n",*(uint32_t *)(f->esp + 4), *(uint32_t *)(f->esp+4));
 		int fd = (int)*(uint32_t *)(f->esp + 4);
 		void* buffer = (void *)*(uint32_t *)(f->esp + 8);
 		uint32_t size = (unsigned)*((uint32_t *)(f->esp + 12));
+		//printf("---------왜 3??? ------ %d %x\n",fd,fd);
+		//hex_dump(f->esp, f->esp, 100, 1);
+		
 		f->eax = read(fd, buffer, size);
+		
 
 	}
 	else if (choose == SYS_WRITE) {
@@ -272,18 +277,25 @@ void exit(int status)
 int read(int fd, void *buffer, unsigned size) {
 	unsigned int i;
 
+	if (!is_user_vaddr(buffer)){
+		//return -1; kill process!!!
+		exit(-1);
+	}
 	if(fd==0){ // standard input
 		for(i=0; i< size; i++)
 			*(uint8_t *) (buffer+i) = input_getc();
 		return size;
 	}
-	else if(fd > 2){
+	else if(fd > 2 && fd < 131){
 		//return the number of bytes actually read, file.c
+		//debug
+		//printf("-------------------File descripter : %d %x-------------------\n",fd,fd);
 		struct thread *cur = thread_current();
 		if(cur->files[fd] == NULL)
 			exit(-1);
 		return file_read(cur->files[fd], buffer, size);
 	}
+
 	else{
 		return -1;
 	}
