@@ -149,9 +149,15 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
   //exit if memory is pointing kernel space
-  if (user == 0 || is_kernel_vaddr(fault_addr))
-	  exit(-1);
 
+//	(not_present) ? printf("TRUE\n"):printf("FALSE\n");
+//	(write) ? printf("TRUE\n"): printf("FALSE\n");
+//	(user) ? printf("TRUE\n"): printf("FALSE\n");
+
+
+  	if (user == 0 || is_kernel_vaddr(fault_addr) || not_present/*for 2_2 bad_read*/){
+		exit(-1);
+	}
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */

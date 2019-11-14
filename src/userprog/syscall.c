@@ -27,8 +27,11 @@ struct file{
 
 /*func for check bad stack pointer*/
 static bool vaddr_valid_checker(void *p){
+	
+	//printf("NULL?????\n");
 	return (!is_user_vaddr(p)  ||\
 	 (pagedir_get_page(thread_current()->pagedir, (p))  ==  NULL));
+	
 }
 
 /*func in referrence*/
@@ -58,20 +61,21 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 	if (user == 0 || is_kernel_vaddr(f->esp))
 		exit(-1);*/ 
 
-
+	/*no use??*/
 	if (get_user((uint8_t *)(f->esp)) == -1) {
         
 		//printf("\nSeg-Fault! - access to invalid area\n");
 		exit(-1);
 	}
-
+	
+	
 	//printf("\nSystem call_NUM:%d\n",choose);
-	//hex_dump((f->esp), (f->esp), 100, 1);
+	hex_dump((f->esp), (f->esp), 100, 1);
 
 	/*is any bad pointer passes here??*/
 	if ((!is_user_vaddr(f->esp)) || (pagedir_get_page(thread_current()->pagedir, (f->esp)) == NULL)) {
 	
-//		printf("\n\n\n*************is any bad pointer passes here??***************\n\n\n");
+		//printf("\n\n\n*************is any bad pointer passes here??***************\n\n\n");
 		exit(thread_current()->exit_status);
 	}
 	//for test case bad-ptr address in argument
@@ -88,7 +92,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 		halt();
 	}
 	else if (choose == SYS_EXIT) {
-		//printf("system handler-SYS_EXIT");
+	//	printf("system handler-SYS_EXIT");
 		if (!is_user_vaddr(f->esp + 4) || (pagedir_get_page(thread_current()->pagedir, (f->esp + 4)) == NULL ))
 			exit(-1);
 		else
@@ -120,7 +124,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 			f->eax = wait((pid_t)(*(uint32_t*)(f->esp + 4)));
 	}
 	else if (choose == SYS_READ) {
-		//printf("system handler-SYS_READ");
+	//	printf("system handler-SYS_READ");
 		if (vaddr_valid_checker(f->esp + 4))
 			exit(-1);
 		else if (vaddr_valid_checker(f->esp + 8))
@@ -314,7 +318,7 @@ int write(int fd, const void *buffer, unsigned size) {
 	if (fd == 1) {
 	//for debug
 		//printf("in syscall-write : %d, 0X%p, %d\n", fd, buffer, size);
-		//
+		//hex_dump(buffer, buffer, 50 , 1);
 		putbuf(buffer, size);
 		
 	//	for (i=0; i < (int)size; i++) {
