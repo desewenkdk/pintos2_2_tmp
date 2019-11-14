@@ -53,9 +53,8 @@ process_execute (const char *file_name) //process_execute() -> thread_create(fil
   strlcpy(real_filename, file_name, PGSIZE);
 
   real_filename = strtok_r(real_filename, " ", &nextpointer);//test1 parse file name
-  printf("fileN : %s\n",real_filename);
   if (filesys_open(real_filename) == NULL){
-	  	printf("here?\n=======");
+	 // 	printf("here?\n=======");
 		return -1;
 	}
   /* Create a new thread to execute FILE_NAME. */
@@ -66,7 +65,7 @@ process_execute (const char *file_name) //process_execute() -> thread_create(fil
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
 
-  printf("--------%s-----------\n", real_filename); 
+  //printf("--------%s-----------\n", real_filename); 
   return tid;
 }
 

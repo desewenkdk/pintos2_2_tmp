@@ -82,7 +82,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 
 
 	//check esp pointer which points kernel or user : userprog/exception.c!!
-	printf("choose %d ------- %d\n", choose, SYS_EXEC);
+	///printf("choose %d ------- %d\n", choose, SYS_EXEC);
 	if (choose == SYS_HALT) {
 		//printf("system handler-SYS_HALT");
 		halt();
@@ -95,20 +95,20 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 			exit(*(uint32_t*)(f->esp + 4));
 	}
 	else if (choose == SYS_EXEC) {
-		printf("system handler-SYS_EXEC");
+	//	printf("system handler-SYS_EXEC");
 		//printf("\nSystem handler-SYS_EXEC---- argument:%p\n", *(uint32_t*)(f->esp + 4)); //�ּҰ��� �Ķ���ͷ� ���� �Լ��鿡 �����Ѵ�. esp�� ��ȿ���������� ����� �ּҰ��� invalid�� �� �ִ�.
 		if (!is_user_vaddr(f->esp + 4) || (pagedir_get_page(thread_current()->pagedir, (f->esp + 4)) == NULL)){
-			printf("111111111111111111111111111111\n");
+	//		printf("111111111111111111111111111111\n");
 			exit(-1);
 		}
 		//for test case exec-bad-ptr -> ���ʿ��ѵ�.
 		else if (!is_user_vaddr(*(uint32_t*)(f->esp + 4)) || (pagedir_get_page(thread_current()->pagedir, (*(uint32_t*)(f->esp + 4))) == NULL)) {
 			//printf("\nToo low address for argument\n");
-			printf("222222222222222222222222222222\n");
+	//		printf("222222222222222222222222222222\n");
 			exit(-1);
 		}
 		else{
-			printf("33333333333333333333333333333333\n");
+	//		printf("33333333333333333333333333333333\n");
 			f->eax = exec((const char*)*(uint32_t*)(f->esp + 4));
 		}
 	}
@@ -251,7 +251,7 @@ void halt(void)
 
 pid_t exec(const char *cmd_line)
 {
-	printf("\\\\%s\n",cmd_line);
+	//printf("\\\\%s\n",cmd_line);
 	return process_execute(cmd_line);
 }
 
@@ -337,7 +337,7 @@ int write(int fd, const void *buffer, unsigned size) {
 		int ret;
 		/*returns the number of bytes actually written, file.c*/
 		ret =  file_write(cur->files[fd],buffer,size);
-		printf("rox----------%d---------\n", ret);
+		
 		return ret;
 	}
 	return -1;
@@ -372,7 +372,8 @@ int open(const char *file){
 	for(i=3; i<131; i++){
 		if(cur_t->files[i] == NULL){
 			cur_t->files[i] = fileopen;
-			file_deny_write(cur_t->files[i]);
+			if (strcmp(cur_t->name, file) == 0)
+				file_deny_write(cur_t->files[i]);
 			return i;
 		}
 	}
