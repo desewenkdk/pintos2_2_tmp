@@ -487,10 +487,16 @@ init_thread (struct thread *t, const char *name, int priority)
 	for(i=0; i<128; i++){
 		t->files[i] = NULL;
 	}
-  sema_init(&(t->sema_lock), 0);
-  sema_init(&(t->sema_mem), 0);
+	
+	//initializing semaphores for threads(process)
+  	sema_init(&(t->sema_lock), 0);
+  	sema_init(&(t->sema_mem), 0);
+
+	/*semaphore to stay alive parent until child is successfully loaded*/
+	sema_init(&(t->sema_load), 0);
   //ls_child
   
+
   list_init(&(t->ls_child));
   list_push_back(&(running_thread()->ls_child),&(t->ls_child_elem));
   // list_push_back(&(t->ls_child), &(t->ls_child_elem));

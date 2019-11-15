@@ -108,6 +108,12 @@ struct thread
 	//for synchronize
 	struct semaphore sema_lock;
 	struct semaphore sema_mem; // for keep in memory until child process is removed
+	
+	/*
+	for ensure to wait parent process until child's load is done successfully! 
+	start_proecss of child process can be late than end of process_execute of parent!!
+	*/
+	struct semaphore sema_load;
 
 	//store exit status of thread
 	uint32_t exit_status;

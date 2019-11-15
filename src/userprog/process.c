@@ -29,6 +29,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
+bool flag_for_ct = false;
 tid_t
 process_execute (const char *file_name) //process_execute() -> thread_create(filename,start_process,..) -> \
 ->load(..,filename,..) =>parse:filesys_open(…), construct stack:setup_stack(esp);
@@ -41,7 +42,7 @@ process_execute (const char *file_name) //process_execute() -> thread_create(fil
   char *nextpointer = NULL;
 
   real_filename = (char *)malloc(sizeof(char) * MAX_FILE_NAME);
-  
+	struct thread *cur = thread_current();  
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -62,8 +63,12 @@ process_execute (const char *file_name) //process_execute() -> thread_create(fil
   //printf("\nIn process_execute, filename : %s\n",real_filename);
   tid = thread_create (real_filename, PRI_DEFAULT, start_process, fn_copy);
 
+	/*2_2 lock parent sdfprocess until child process starts!!*/
+	sema_down(&(cur->sema_load));
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+
 
   //printf("--------%s-----------\n", real_filename); 
   return tid;
@@ -85,12 +90,15 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
-
-  /* Start the user process by simulating a return from an
+	
+	palloc_free_page(file_name);
+	sema_up(&(thread_current()->parent->sema_load));
+	
+	if(!success){
+		flag_for_ct= true;
+		exit(-1);	
+	}
+	  /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
      arguments on the stack in the form of a `struct intr_frame',

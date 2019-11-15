@@ -19,6 +19,11 @@
 
 static void syscall_handler(struct intr_frame*);
 static bool vaddr_valid_checker(void *p);
+
+//for implement reader-writer synchronization(to solve reader-writer problem)
+struct semaphore mutex, wrt;
+int readcount;
+
 struct file{
 	struct inode *inode;
 	off_t pos;
@@ -45,7 +50,13 @@ static int get_user(const uint8_t *uaddr)
 
 void syscall_init(void) 
 {
+	//from 2_2 initialize semaphores for read-write sync.
+	sema_init(&wrt, 1);
+	sema_init(&mutex, 1);
+	readcount = 0;
+
   	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+	
 }
 
 static void syscall_handler (struct intr_frame *f UNUSED) 
@@ -70,7 +81,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 	
 	
 	//printf("\nSystem call_NUM:%d\n",choose);
-	hex_dump((f->esp), (f->esp), 100, 1);
+	//hex_dump((f->esp), (f->esp), 100, 1);
 
 	/*is any bad pointer passes here??*/
 	if ((!is_user_vaddr(f->esp)) || (pagedir_get_page(thread_current()->pagedir, (f->esp)) == NULL)) {
@@ -284,37 +295,61 @@ void exit(int status)
 
 int read(int fd, void *buffer, unsigned size) {
 	unsigned int i;
-
+	int num_readbyte;
 	if (!is_user_vaddr(buffer)){
 		//return -1; kill process!!!
 		exit(-1);
 	}
+		sema_down(&mutex);
+		readcount++;
+		if (readcount == 1){
+			sema_down(&wrt);
+		}
+		sema_up(&mutex);
+	
 	if(fd==0){ // standard input
 		for(i=0; i< size; i++)
 			*(uint8_t *) (buffer+i) = input_getc();
 		return size;
 	}
-	else if(fd > 2 && fd < 131){
+	
+	else if (fd > 2 && fd < 131){
+		
+	
 		//return the number of bytes actually read, file.c
 		//debug
 		//printf("-------------------File descripter : %d %x-------------------\n",fd,fd);
 		struct thread *cur = thread_current();
 		if(cur->files[fd] == NULL)
 			exit(-1);
-		return file_read(cur->files[fd], buffer, size);
-	}
+	
+
+		num_readbyte = file_read(cur->files[fd], buffer, size);
+		
+	}	
 
 	else{
-		return -1;
+		num_readbyte =  -1;
 	}
+	sema_down(&mutex);
+	readcount--;
+	if(readcount == 0){
+		sema_up(&wrt);
+	}
+	sema_up(&mutex);
 
-	//abnormal situation
-	return -1;
+
+	return num_readbyte;
 }
 
 int write(int fd, const void *buffer, unsigned size) {
-	int i;
+	int i,ret;
 	//printf("1111111111111111111\n");
+	
+	sema_down(&wrt);
+	if(!is_user_vaddr(buffer)){
+		exit(-1);
+	}
 	if (fd == 1) {
 	//for debug
 		//printf("in syscall-write : %d, 0X%p, %d\n", fd, buffer, size);
@@ -327,7 +362,7 @@ int write(int fd, const void *buffer, unsigned size) {
 	//	    
 	//	}
 	//	printf("%u", *(uint8_t *)(buffer));
-		return size;
+		ret = size;
 	}
 
 	else if (fd > 2 && fd < 131){
@@ -341,10 +376,13 @@ int write(int fd, const void *buffer, unsigned size) {
 		int ret;
 		/*returns the number of bytes actually written, file.c*/
 		ret =  file_write(cur->files[fd],buffer,size);
-		
-		return ret;
+
 	}
-	return -1;
+	else{
+		ret = -1;
+	}
+	sema_up(&wrt);	
+	return ret;
 }
 
 bool create(const char *file, unsigned initial_size){
@@ -361,16 +399,23 @@ bool remove(const char *file){
 
 /*it must return "file descripter" value from created file -> index of files array*/
 int open(const char *file){
-	int i;
+	int i,return_fd;
 	if (file == NULL)
 		exit(-1);
 
+		sema_down(&mutex);
+		readcount++;
+		if (readcount == 1){
+			sema_down(&wrt);
+		}
+		sema_up(&mutex);
+	
 	struct file *fileopen = filesys_open(file);
 	struct thread *cur_t = thread_current();
 
 	//file is not exist, return -1 
 	if (fileopen == NULL){
-		return -1;
+		return_fd =  -1;
 	}
 	//iteration start with fd = 3; fd 0,1,2 is already defined for (STDIN_FILENO) , (STDOUT_FILENO), STDERR.
 	for(i=3; i<131; i++){
@@ -378,11 +423,18 @@ int open(const char *file){
 			cur_t->files[i] = fileopen;
 			if (strcmp(cur_t->name, file) == 0)
 				file_deny_write(cur_t->files[i]);
-			return i;
+			return_fd = i;
+			break;
 		}
 	}
-	//something goes wrong.....
-	return -1;	 
+	sema_down(&mutex);
+	readcount--;
+	if(readcount == 0){
+		sema_up(&wrt);
+	}
+	sema_up(&mutex);
+
+	return return_fd;	 
 }
 
 int filesize(int fd){
