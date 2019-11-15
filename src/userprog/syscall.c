@@ -61,7 +61,7 @@ void syscall_init(void)
 
 static void syscall_handler (struct intr_frame *f UNUSED) 
 {
-    //printf ("system call handler-----------------------------------!\n");
+    printf ("system call handler-----------------------------------!\n");
 	uint32_t choose = 0;
 	choose = *(uint32_t *)(f->esp);
 	/*
@@ -80,7 +80,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 	}
 	
 	
-	//printf("\nSystem call_NUM:%d\n",choose);
+	printf("System call_NUM:%d\n\n",choose);
 	//hex_dump((f->esp), (f->esp), 100, 1);
 
 	/*is any bad pointer passes here??*/
@@ -112,6 +112,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 	else if (choose == SYS_EXEC) {
 	//	printf("system handler-SYS_EXEC");
 		//printf("\nSystem handler-SYS_EXEC---- argument:%p\n", *(uint32_t*)(f->esp + 4)); //�ּҰ��� �Ķ���ͷ� ���� �Լ��鿡 �����Ѵ�. esp�� ��ȿ���������� ����� �ּҰ��� invalid�� �� �ִ�.
+		printf("syn-readdddddddd\n");
 		if (!is_user_vaddr(f->esp + 4) || (pagedir_get_page(thread_current()->pagedir, (f->esp + 4)) == NULL)){
 	//		printf("111111111111111111111111111111\n");
 			exit(-1);
@@ -123,6 +124,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 			exit(-1);
 		}
 		else{
+			printf("syn-read %s\n",thread_current()->name);
 	//		printf("33333333333333333333333333333333\n");
 			f->eax = exec((const char*)*(uint32_t*)(f->esp + 4));
 		}
@@ -166,6 +168,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 		int fd = (int)*(uint32_t *)(f->esp + 4);
 		void* buffer = (void *)*(uint32_t *)(f->esp + 8);
 		uint32_t size = (uint32_t)*(uint32_t *)(f->esp + 12);
+		printf("readsyn %s\n", thread_current()->name);
 		f->eax = write(fd, buffer, size);
 	}
 
@@ -266,7 +269,7 @@ void halt(void)
 
 pid_t exec(const char *cmd_line)
 {
-	//printf("\\\\%s\n",cmd_line);
+	printf("synread syscall.c exec calling %s\n",cmd_line);
 	return process_execute(cmd_line);
 }
 
@@ -366,6 +369,7 @@ int write(int fd, const void *buffer, unsigned size) {
 	//	    
 	//	}
 	//	printf("%u", *(uint8_t *)(buffer));
+		printf("synread here? %s\n", thread_current()->name);
 		ret = size;
 	}
 
@@ -373,20 +377,23 @@ int write(int fd, const void *buffer, unsigned size) {
 	//check for access to NULL file pointer
 		struct thread *cur = thread_current();
 		if (cur->files[fd] == NULL){
-			//printf("??????????\n");
+			printf("?????????? %s\n", thread_current()->name);
 			sema_up(&wrt);
 			exit(-1);
 		}
 
 		//block to write when this file is being written
 		if(cur->files[fd]->deny_write){
+			printf("den???synread?? %s", thread_current()->name);
 			file_deny_write(cur->files[fd]);
 		}		
 
 		int ret;
 		/*returns the number of bytes actually written, file.c*/
 		ret = file_write(cur->files[fd],buffer,size);
+		printf("before semaup %s %d\n", cur->name, ret);
 		sema_up(&wrt);
+		printf("synread %s success?? write : %d\n", cur->name, ret);
 		return ret;
 	}
 	else{
