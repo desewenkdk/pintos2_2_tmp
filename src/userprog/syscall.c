@@ -287,8 +287,12 @@ void exit(int status)
 	//close file when thread exits
 	int i;
 	for(i=3; i<131; i++){
-		if (thread_current()->files[i] != NULL)
+		if (thread_current()->files[i] != NULL){
+
+//to check fd
+//			printf("in exit  fd:  %d\n",i);
 			close(i);
+		}
 	}
 	thread_exit();
 }
@@ -370,13 +374,20 @@ int write(int fd, const void *buffer, unsigned size) {
 		struct thread *cur = thread_current();
 		if (cur->files[fd] == NULL){
 			//printf("??????????\n");
+			sema_up(&wrt);
 			exit(-1);
 		}
 
+		//block to write when this file is being written
+		if(cur->files[fd]->deny_write){
+			file_deny_write(cur->files[fd]);
+		}		
+
 		int ret;
 		/*returns the number of bytes actually written, file.c*/
-		ret =  file_write(cur->files[fd],buffer,size);
-
+		ret = file_write(cur->files[fd],buffer,size);
+		sema_up(&wrt);
+		return ret;
 	}
 	else{
 		ret = -1;
@@ -399,30 +410,43 @@ bool remove(const char *file){
 
 /*it must return "file descripter" value from created file -> index of files array*/
 int open(const char *file){
-	int i,return_fd;
+	int i,return_fd = -1;
 	if (file == NULL)
 		exit(-1);
 
-		sema_down(&mutex);
-		readcount++;
-		if (readcount == 1){
-			sema_down(&wrt);
-		}
-		sema_up(&mutex);
-	
+	//printf("file : %s\n", file);
 	struct file *fileopen = filesys_open(file);
 	struct thread *cur_t = thread_current();
 
 	//file is not exist, return -1 
+	//printf("file position : %d", fileopen->pos);
 	if (fileopen == NULL){
-		return_fd =  -1;
+		//must return open function....directly before locked.
+		return -1;
 	}
 	//iteration start with fd = 3; fd 0,1,2 is already defined for (STDIN_FILENO) , (STDOUT_FILENO), STDERR.
+
+
+	sema_down(&mutex);
+	readcount++;
+	if (readcount == 1){
+		sema_down(&wrt);
+	}
+	sema_up(&mutex);
+	
+
 	for(i=3; i<131; i++){
 		if(cur_t->files[i] == NULL){
+//check for filename and thread name for rox
+			//printf("%s %s\n", cur_t->name, file);
+			if (strcmp(thread_name(), file) == 0){
+				file_deny_write(fileopen);
+//checking rox-child, is file in current thread is closed? 만약 그렇다면 NULL체크도 했어야 했다.
+				//printf("is denyed?? %s %s\n", cur_t->name, file);
+//				printf("%s fd is %d\n", file, i);
+			}
+			//update current file, here. not upper	
 			cur_t->files[i] = fileopen;
-			if (strcmp(cur_t->name, file) == 0)
-				file_deny_write(cur_t->files[i]);
 			return_fd = i;
 			break;
 		}
@@ -449,6 +473,7 @@ void seek(int fd, unsigned position){
 	struct file *f_to_see = cur->files[fd];
 	if (cur -> files[fd] == NULL)
 		exit(-1);	
+	//printf("rox-child\n");
 	file_seek(f_to_see,position);
 }
 
@@ -458,7 +483,7 @@ unsigned tell(int fd){
 	if (f_to_tell == NULL)
 		exit(-1);
 
-    file_tell(f_to_tell);
+    return file_tell(f_to_tell);
 }
 
 void close(int fd){
@@ -469,9 +494,17 @@ void close(int fd){
 	
 	//before close your file, make sure to thread->files[fd] make NULL!! file_close can't do that.
 	else{
-		file_allow_write(cur->files[fd]);
-		cur->files[fd] = NULL;
+		//these tasks are executing in file_close function.
+		//file_allow_write(cur->files[fd]);
+		//cur->files[fd] = NULL;
+		//printf("rox-child %s\n" , cur->files[fd]->deny_write ? "true" : "false");
+
+
+//		printf("fd : %d", fd);
+//		printf("aaa %s %s\n",cur->name, cur->parent->name);
 		file_close(f_to_close);
+		cur->files[fd] = NULL;//항상 닫았으면, thread가 갖고 있는 파일 (정보)도 NULL로 만들어서 닫혔다고 인식시키자.
+//		printf("%d fd is closed\n",fd);
 	}
 }
 
