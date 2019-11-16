@@ -16,13 +16,15 @@
 #include "filesys/filesys.h"
 #include "filesys/off_t.h"
 #include "filesys/inode.h"
+#include "threads/synch.h"
 
 static void syscall_handler(struct intr_frame*);
 static bool vaddr_valid_checker(void *p);
 
 //for implement reader-writer synchronization(to solve reader-writer problem)
-struct semaphore mutex, wrt;
-int readcount;
+//struct semaphore mutex, wrt;
+//int readcount;
+struct lock file_lock;
 
 struct file{
 	struct inode *inode;
@@ -51,10 +53,12 @@ static int get_user(const uint8_t *uaddr)
 void syscall_init(void) 
 {
 	//from 2_2 initialize semaphores for read-write sync.
+	/*
 	sema_init(&wrt, 1);
 	sema_init(&mutex, 1);
 	readcount = 0;
-
+*/
+	lock_init(&file_lock);
   	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 	
 }
@@ -307,13 +311,14 @@ int read(int fd, void *buffer, unsigned size) {
 		//return -1; kill process!!!
 		exit(-1);
 	}
+/*
 		sema_down(&mutex);
 		readcount++;
 		if (readcount == 1){
 			sema_down(&wrt);
 		}
 		sema_up(&mutex);
-	
+*/	
 	if(fd==0){ // standard input
 		for(i=0; i< size; i++)
 			*(uint8_t *) (buffer+i) = input_getc();
@@ -338,13 +343,14 @@ int read(int fd, void *buffer, unsigned size) {
 	else{
 		num_readbyte =  -1;
 	}
+/*
 	sema_down(&mutex);
 	readcount--;
 	if(readcount == 0){
 		sema_up(&wrt);
 	}
 	sema_up(&mutex);
-
+*/
 
 	return num_readbyte;
 }
@@ -369,7 +375,7 @@ int write(int fd, const void *buffer, unsigned size) {
 	//	    
 	//	}
 	//	printf("%u", *(uint8_t *)(buffer));
-		printf("synread here? %s\n", thread_current()->name);
+		printf("syscall-write synread here? %s\n", thread_current()->name);
 		ret = size;
 	}
 
@@ -378,23 +384,23 @@ int write(int fd, const void *buffer, unsigned size) {
 		struct thread *cur = thread_current();
 		if (cur->files[fd] == NULL){
 			printf("?????????? %s\n", thread_current()->name);
-			sema_up(&wrt);
+			//sema_up(&wrt);
 			exit(-1);
 		}
 
 		//block to write when this file is being written
 		if(cur->files[fd]->deny_write){
-			printf("den???synread?? %s", thread_current()->name);
+			printf("syscall-write deny???synread?? %s", thread_current()->name);
 			file_deny_write(cur->files[fd]);
 		}		
 
 		int ret;
 		/*returns the number of bytes actually written, file.c*/
 		ret = file_write(cur->files[fd],buffer,size);
-		printf("before semaup %s %d\n", cur->name, ret);
-		sema_up(&wrt);
-		printf("synread %s success?? write : %d\n", cur->name, ret);
-		return ret;
+		printf("syscall-write before semaup %s %d\n", cur->name, ret);
+	//	sema_up(&wrt);
+		printf("syscall-write synread %s success?? write : %d\n", cur->name, ret);
+	//	return ret;
 	}
 	else{
 		ret = -1;
@@ -418,35 +424,50 @@ bool remove(const char *file){
 /*it must return "file descripter" value from created file -> index of files array*/
 int open(const char *file){
 	int i,return_fd = -1;
-	if (file == NULL)
-		exit(-1);
+	printf("syscall-open file : %s\n", file);
+	printf("syscall-open %s\n", thread_current()->name);
+	
+	if(file == NULL){
+		printf("in syscall-open file %s failed open, NULL t : %s", file, thread_current()->name);
+		//exit(-1);
+		return_fd = -1;
+	}
 
-	//printf("file : %s\n", file);
+	vaddr_valid_checker(file);	
 	struct file *fileopen = filesys_open(file);
 	struct thread *cur_t = thread_current();
-
-	//file is not exist, return -1 
-	//printf("file position : %d", fileopen->pos);
-	if (fileopen == NULL){
-		//must return open function....directly before locked.
-		return -1;
-	}
-	//iteration start with fd = 3; fd 0,1,2 is already defined for (STDIN_FILENO) , (STDOUT_FILENO), STDERR.
-
-
+/*
 	sema_down(&mutex);
 	readcount++;
 	if (readcount == 1){
 		sema_down(&wrt);
 	}
 	sema_up(&mutex);
-	
+*/	
+	//file is not exist, return -1 
+	//printf("file position : %d", fileopen->pos);
+	if (fileopen == NULL){
+		//must return open function....directly before locked.
+		printf("syscall-open fileopen NULL %s\n",thread_current()->name);
+		return_fd = -1;
+	}
+	//iteration start with fd = 3; fd 0,1,2 is already defined for (STDIN_FILENO) , (STDOUT_FILENO), STDERR.
+
+/*
+	sema_down(&mutex);
+	readcount++;
+	if (readcount == 1){
+		sema_down(&wrt);
+	}
+	sema_up(&mutex);
+*/	
 
 	for(i=3; i<131; i++){
 		if(cur_t->files[i] == NULL){
 //check for filename and thread name for rox
 			//printf("%s %s\n", cur_t->name, file);
 			if (strcmp(thread_name(), file) == 0){
+				printf("syscall-open denied open %s\n",thread_current()->name);
 				file_deny_write(fileopen);
 //checking rox-child, is file in current thread is closed? 만약 그렇다면 NULL체크도 했어야 했다.
 				//printf("is denyed?? %s %s\n", cur_t->name, file);
@@ -458,13 +479,16 @@ int open(const char *file){
 			break;
 		}
 	}
+
+/*	
 	sema_down(&mutex);
 	readcount--;
 	if(readcount == 0){
+		printf("syscall-open readcount 0 %s\n", thread_current()->name);
 		sema_up(&wrt);
 	}
 	sema_up(&mutex);
-
+*/
 	return return_fd;	 
 }
 
@@ -496,15 +520,17 @@ unsigned tell(int fd){
 void close(int fd){
 	struct thread *cur = thread_current();
 	struct file *f_to_close = cur->files[fd];
+
+	
 	if (f_to_close == NULL)
 		exit(-1);
 	
 	//before close your file, make sure to thread->files[fd] make NULL!! file_close can't do that.
 	else{
 		//these tasks are executing in file_close function.
-		//file_allow_write(cur->files[fd]);
+		file_allow_write(cur->files[fd]);
 		//cur->files[fd] = NULL;
-		//printf("rox-child %s\n" , cur->files[fd]->deny_write ? "true" : "false");
+		printf("syscall-close t:%s can write? %s\n" ,cur->name, cur->files[fd]->deny_write ? "false" : "true");
 
 
 //		printf("fd : %d", fd);

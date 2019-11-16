@@ -28,7 +28,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
-   thread id, or TID_ERROR if the thread cannot be created. */
+   thread id, or TID_ERROR if the thread cnnot be created. */
 bool flag_for_ct = false;
 tid_t
 process_execute (const char *file_name) //process_execute() -> thread_create(filename,start_process,..) -> \
@@ -55,17 +55,24 @@ process_execute (const char *file_name) //process_execute() -> thread_create(fil
 
   real_filename = strtok_r(real_filename, " ", &nextpointer);//test1 parse file name
   if (filesys_open(real_filename) == NULL){
-	  	printf("process execute syn-read here?=======\n");
+	  	printf("process execute file open returns NULL syn-read here?======= %s %s\n%s\n", thread_current()->name, real_filename, file_name);
 		return -1;
 	}
   /* Create a new thread to execute FILE_NAME. */
   //tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   //printf("\nIn process_execute, filename : %s\n",real_filename);
 	printf("in process_Exec, before create, tid : %d filename :%s\n", cur->tid, real_filename);
-  tid = thread_create (real_filename, PRI_DEFAULT, start_process, fn_copy);
+    tid = thread_create (real_filename, PRI_DEFAULT, start_process, fn_copy);
 	printf("in process_Exec, filename : %s, curr_t : %s\n", real_filename, cur->name);
+	
+
 	/*2_2 lock parent sdfprocess until child process starts!!*/
 	sema_down(&(cur->sema_load));
+	
+
+	if(!(thread_current()->exec_success))tid = TID_ERROR;
+	printf("in process_Exec, after sema down %s\n",cur->name);
+
 
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
@@ -89,14 +96,18 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
+	printf("start process, before load  %s %s\n",file_name, thread_current()->name);
   success = load (file_name, &if_.eip, &if_.esp);
 
-	
+	printf("start process,load success?? %s %s\n ", file_name, thread_current()->name);
 	palloc_free_page(file_name);
 	sema_up(&(thread_current()->parent->sema_load));
-	
+	printf("STARt_process after sema_load up  currthread:%s\n", thread_current()->name);
+		
 	if(!success){
 		flag_for_ct= true;
+        thread_current()->parent->exec_success = false;		
 		exit(-1);	
 	}
 	  /* Start the user process by simulating a return from an

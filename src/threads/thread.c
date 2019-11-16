@@ -495,7 +495,9 @@ init_thread (struct thread *t, const char *name, int priority)
 	/*semaphore to stay alive parent until child is successfully loaded*/
 	sema_init(&(t->sema_load), 0);
   //ls_child
-  
+    
+    /*successfull exec*/
+    t->exec_success = true; 
 
   list_init(&(t->ls_child));
   list_push_back(&(running_thread()->ls_child),&(t->ls_child_elem));

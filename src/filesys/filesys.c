@@ -7,8 +7,13 @@
 #include "filesys/inode.h"
 #include "filesys/directory.h"
 
+//#include "threads/synch.h"
+//#include "threads/interrupt.h"
+
 /* Partition that contains the file system. */
 struct block *fs_device;
+
+//struct lock filelock;
 
 static void do_format (void);
 
@@ -66,12 +71,22 @@ filesys_create (const char *name, off_t initial_size)
 struct file *
 filesys_open (const char *name)
 {
+//	intr_disable();
+//	lock_acquire(& filelock);
+//	intr_enable();
+
+	printf("in filesys.c filesysopen, filename : %s\n", name);
   struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
 
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
   dir_close (dir);
+
+//	intr_disable();
+//	lock_release(& filelock);
+//	intr_enable();
+
 
   return file_open (inode);
 }

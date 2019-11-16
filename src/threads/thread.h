@@ -115,6 +115,9 @@ struct thread
 	*/
 	struct semaphore sema_load;
 
+    /*check for execution*/
+    bool exec_success;
+    
 	//store exit status of thread
 	uint32_t exit_status;
 #endif
