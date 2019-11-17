@@ -311,6 +311,8 @@ int read(int fd, void *buffer, unsigned size) {
 		//return -1; kill process!!!
 		exit(-1);
 	}
+
+	lock_acquire(&file_lock);
 /*
 		sema_down(&mutex);
 		readcount++;
@@ -343,6 +345,8 @@ int read(int fd, void *buffer, unsigned size) {
 	else{
 		num_readbyte =  -1;
 	}
+
+	lock_release(&file_lock);
 /*
 	sema_down(&mutex);
 	readcount--;
@@ -359,7 +363,8 @@ int write(int fd, const void *buffer, unsigned size) {
 	int i,ret;
 	//printf("1111111111111111111\n");
 	
-	sema_down(&wrt);
+	//sema_down(&wrt);
+	lock_acquire(&file_lock);
 	if(!is_user_vaddr(buffer)){
 		exit(-1);
 	}
@@ -405,7 +410,8 @@ int write(int fd, const void *buffer, unsigned size) {
 	else{
 		ret = -1;
 	}
-	sema_up(&wrt);	
+	lock_release(&file_lock);
+	//	sema_up(&wrt);	
 	return ret;
 }
 
@@ -434,6 +440,8 @@ int open(const char *file){
 	}
 
 	vaddr_valid_checker(file);	
+
+	lock_acquire(&file_lock);
 	struct file *fileopen = filesys_open(file);
 	struct thread *cur_t = thread_current();
 /*
@@ -444,8 +452,11 @@ int open(const char *file){
 	}
 	sema_up(&mutex);
 */	
+
 	//file is not exist, return -1 
 	//printf("file position : %d", fileopen->pos);
+	
+
 	if (fileopen == NULL){
 		//must return open function....directly before locked.
 		printf("syscall-open fileopen NULL %s\n",thread_current()->name);
@@ -479,7 +490,8 @@ int open(const char *file){
 			break;
 		}
 	}
-
+	
+	lock_release(&file_lock);
 /*	
 	sema_down(&mutex);
 	readcount--;
@@ -489,6 +501,7 @@ int open(const char *file){
 	}
 	sema_up(&mutex);
 */
+	
 	return return_fd;	 
 }
 
