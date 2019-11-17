@@ -436,22 +436,23 @@ bool remove(const char *file){
 
 /*it must return "file descripter" value from created file -> index of files array*/
 int open(const char *file){
-	int i,return_fd = -1;
+	int i,return_fd;
 	//printf("syscall-open file : %s\n", file);
 	//printf("syscall-open %s\n", thread_current()->name);
 	
 	if(file == NULL){
 	//	printf("in syscall-open file %s failed open, NULL t : %s", file, thread_current()->name);
-		//exit(-1);
+	//	exit(-1);
 		return_fd = -1;
 	}
-
+	else{
 	vaddr_valid_checker(file);	
 
 	//acquire before fileopen.
 	lock_acquire(&file_lock);
 	struct file *fileopen = filesys_open(file);
 	struct thread *cur_t = thread_current();
+
 /*
 	sema_down(&mutex);
 	readcount++;
@@ -469,6 +470,7 @@ int open(const char *file){
 		//must return open function....directly before locked.
 	//	printf("syscall-open fileopen NULL %s\n",thread_current()->name);
 		return_fd = -1;
+	//	exit(-1);
 	}
 	//iteration start with fd = 3; fd 0,1,2 is already defined for (STDIN_FILENO) , (STDOUT_FILENO), STDERR.
 
@@ -480,26 +482,26 @@ int open(const char *file){
 	}
 	sema_up(&mutex);
 */	
-
-	for(i=3; i<131; i++){
-		if(cur_t->files[i] == NULL){
+	else{
+		for(i=3; i<131; i++){
+			if(cur_t->files[i] == NULL){
 //check for filename and thread name for rox
 			//printf("%s %s\n", cur_t->name, file);
-			if (strcmp(thread_name(), file) == 0){
+				if (strcmp(thread_name(), file) == 0){
 //file write deny처리가 안 되어있나 확인
 //				printf("syscall-open denied open %s\n",thread_current()->name);
-				file_deny_write(fileopen);
+					file_deny_write(fileopen);
 //checking rox-child, is file in current thread is closed? 만약 그렇다면 NULL체크도 했어야 했다.
 				//printf("is denyed?? %s %s\n", cur_t->name, file);
 //				printf("%s fd is %d\n", file, i);
-			}
+				}
 			//update current file, here. not upper	
-			cur_t->files[i] = fileopen;
-			return_fd = i;
-			break;
+				cur_t->files[i] = fileopen;
+				return_fd = i;
+				break;
+			}
 		}
 	}
-	
 	lock_release(&file_lock);
 /*	
 	sema_down(&mutex);
@@ -510,7 +512,7 @@ int open(const char *file){
 	}
 	sema_up(&mutex);
 */
-	
+	}
 	return return_fd;	 
 }
 
