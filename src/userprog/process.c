@@ -40,6 +40,8 @@ process_execute (const char *file_name) //process_execute() -> thread_create(fil
   tid_t tid;
   char *real_filename;
   char *nextpointer = NULL;
+	struct list_elem *e;
+	struct thread *t;
 
   real_filename = (char *)malloc(sizeof(char) * MAX_FILE_NAME);
 	struct thread *cur = thread_current();  
@@ -68,22 +70,30 @@ process_execute (const char *file_name) //process_execute() -> thread_create(fil
 //	printf("in process_Exec, filename : %s, curr_t : %s\n", real_filename, cur->name);
 	
 
+	//if(!(thread_current()->exec_success))tid = TID_ERROR;
 	/*2_2 lock parent sdfprocess until child process starts!!*/
 	sema_down(&(cur->sema_load));
 	
 
-	if(!(thread_current()->exec_success))tid = TID_ERROR;
+	//if(!(thread_current()->exec_success))tid = TID_ERROR;
 
 //  부모 스레드의 sema를 다운시켜서 child가 start할 때까지 잠궈놓자.
 //	printf("in process_Exec, after sema down %s\n",cur->name);
 
 
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
-
-
+  if (tid == TID_ERROR){
+    	palloc_free_page (fn_copy); 
+//		printf("process-exec is error??\n");
+	}
   //printf("--------%s-----------\n", real_filename); 
-  return tid;
+  	  for (e = list_begin(&thread_current()->ls_child); e != list_end(&thread_current()->ls_child); e = list_next(e)) {
+    t = list_entry(e, struct thread, ls_child_elem);
+      if (t->parent->exec_success == false) {
+		//printf("process-exec tid error?? %d %s\n",tid, t->name);
+        return process_wait(tid);
+      }
+  }
+	return tid;
 }
 
 /* A thread function that loads a user process and starts it
@@ -158,7 +168,6 @@ process_wait (tid_t child_tid UNUSED)
 	//printf("\nIn process_wait, %d %s\n",(int)child_tid, thread_current()->name);
 	//int loop_flag = 0;
 
-
 	for (child_list_elem = list_begin(&list_child); 
 		child_list_elem != list_end(&list_child);
 		child_list_elem = list_next(child_list_elem)) {
@@ -171,18 +180,26 @@ process_wait (tid_t child_tid UNUSED)
 
     /*if, child's tid is invalid -- if child is not exist or corrupted*/  
     if(tmp_childt->tid < 0){
+//		printf("process-wait tiderror : %d\n",tmp_childt->tid);
        return -1;
     }
+	
+//		printf("process-wait tid : %d\n",tmp_childt->tid);
 		if (tmp_childt->tid == child_tid) {
 			//printf("tid:%d || child thread name:%s || current thread name:%s\n", \
 				(int)(tmp_childt->tid), (tmp_childt->name), (parent_process->name));
+	//		printf("process-wait before sema_lock down child remove curT:%d child:%d\n",parent_process->tid,tmp_childt->tid);
 			sema_down(&(tmp_childt->parent->sema_lock));//parent의 sema값을 down시켜서 child가 exit될 때 까지 wait.
 			//sema_down(&(tmp_childt->sema_lock));//parent가 아니라 child의 sema값을 down시켜서 child가 exit될 때 까지 wait.
 			/*modify to remove child list in process_wait()*/
+	
+	//		printf("process-wait aftersema_lock down before semaup_memchild remove curT:%d child:%d\n",parent_process->tid,tmp_childt->tid);
 			exit_status = tmp_childt->exit_status;
 			list_remove(&(tmp_childt->ls_child_elem));
+
 			sema_up(&(tmp_childt->sema_mem));
 			//free(tmp_childt);
+	//		printf("process-wait aftersema_mem up curT:%d\n",parent_process->tid);
 			return exit_status;
 			//list_remove(tmp_child->ls_child_elem);
 		}
@@ -204,6 +221,8 @@ process_exit (void)
   //printf("process_exit() start------------------------\n");
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
+
+
   pd = cur->pagedir;
   if (pd != NULL) 
     {
@@ -214,23 +233,50 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
   //printf("before process_exit\n");
   
+//	printf("process-exit before p sema_lock up before sema_mem down_memchild remove parent :%d,curT:%d\n",cur->parent->tid,cur->tid);
   sema_up(&(cur->parent->sema_lock));//wake up parent's semaphore.
   //sema_up(&(cur->sema_lock));//wake up child's semaphore lock.
 
+//	printf("process-exit aftere p sema_lock up before sema_mem  downchild remove parent :%d,curT:%d\n",cur->parent->tid,cur->tid);
   /*for debug process exit.*/
   //printf("In process exit-- tid:%d || exit_status:%d\n", \
 	  (int)(cur->tid), (int)(cur->exit_status));
   
   /*modify to remove in process_wait()*/
   //list_remove(&(cur->ls_child_elem));
+
+
   sema_down(&(cur->sema_mem));
+//	sema_up(&(cur->parent->sema_lock));  
+
+/*
+ pd = cur->pagedir;
+  if (pd != NULL) 
+    {
+*/
+      /* Correct ordering here is crucial.  We must set
+         cur->pagedir to NULL before switching page directories,
+         so that a timer interrupt can't switch back to the
+         process page directory.  We must activate the base page
+         directory before destroying the process's page
+         directory, or our active page directory will be one
+         that's been freed (and cleared). */
+/*
+      cur->pagedir = NULL;
+      pagedir_activate (NULL);
+      pagedir_destroy (pd);
+    }
+*/
   //printf("end process_exit\n");
+//	printf("process-exit after sema_lock up sema_mem down child remove parent :%d,curT:%d\n",cur->parent->tid,cur->tid);
 }
 
 /* Sets up the CPU for running user code in the current
