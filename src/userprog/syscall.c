@@ -315,7 +315,7 @@ int read(int fd, void *buffer, unsigned size) {
 
 
 //	printf("syscall-read before lock_acquire cur_t: %s\n", thread_current()->name);
-	lock_acquire(&file_lock);
+//	lock_acquire(&file_lock);
 /*
 		sema_down(&mutex);
 		readcount++;
@@ -351,7 +351,7 @@ int read(int fd, void *buffer, unsigned size) {
 		num_readbyte =  -1;
 	}
 
-	lock_release(&file_lock);
+//	lock_release(&file_lock);
 
 //	printf("syscall-read after lock_release cur_t : %s", thread_current()->name);
 /*
@@ -463,7 +463,7 @@ int open(const char *file){
 	else{
 		vaddr_valid_checker(file);	
 
-		//acquire before fileopen.
+		//acquire before fileopen./
 		lock_acquire(&file_lock);
 		struct file *fileopen = filesys_open(file);
 		struct thread *cur_t = thread_current();
