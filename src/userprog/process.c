@@ -55,15 +55,17 @@ process_execute (const char *file_name) //process_execute() -> thread_create(fil
 
   real_filename = strtok_r(real_filename, " ", &nextpointer);//test1 parse file name
   if (filesys_open(real_filename) == NULL){
-	  	printf("process execute file open returns NULL syn-read here?======= %s %s\n%s\n", thread_current()->name, real_filename, file_name);
+//syn-read가 일루 빠지면서 계속 안 되었었다. 아무래도 파일을 다 쓰기도 전에 계속 파일read에서 열려고 접근했는지 뭔지 사실 잘 모르겠다.
+//	  	printf("process execute file open returns NULL syn-read here?======= %s %s\n%s\n", thread_current()->name, real_filename, file_name);
 		return -1;
 	}
   /* Create a new thread to execute FILE_NAME. */
   //tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  //printf("\nIn process_execute, filename : %s\n",real_filename);
-	printf("in process_Exec, before create, tid : %d filename :%s\n", cur->tid, real_filename);
+
+	//이번에 새로운 스레드를 만드려 하는 부모의 이름을 알아보자.
+//	printf("in process_Exec, before create, tid : %d filename :%s\n", cur->tid, real_filename);
     tid = thread_create (real_filename, PRI_DEFAULT, start_process, fn_copy);
-	printf("in process_Exec, filename : %s, curr_t : %s\n", real_filename, cur->name);
+//	printf("in process_Exec, filename : %s, curr_t : %s\n", real_filename, cur->name);
 	
 
 	/*2_2 lock parent sdfprocess until child process starts!!*/
@@ -71,7 +73,9 @@ process_execute (const char *file_name) //process_execute() -> thread_create(fil
 	
 
 	if(!(thread_current()->exec_success))tid = TID_ERROR;
-	printf("in process_Exec, after sema down %s\n",cur->name);
+
+//  부모 스레드의 sema를 다운시켜서 child가 start할 때까지 잠궈놓자.
+//	printf("in process_Exec, after sema down %s\n",cur->name);
 
 
   if (tid == TID_ERROR)
@@ -96,14 +100,16 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-
-	printf("start process, before load  %s %s\n",file_name, thread_current()->name);
+//지금 실행하려는 스레드가 뭔지파악하는 단계
+//	printf("start process, before load  %s %s\n",file_name, thread_current()->name);
   success = load (file_name, &if_.eip, &if_.esp);
 
-	printf("start process,load success?? %s %s\n ", file_name, thread_current()->name);
+//  load가 성공적으로 되었는가?
+//	printf("start process,load success?? %s %s\n ", file_name, thread_current()->name);
 	palloc_free_page(file_name);
 	sema_up(&(thread_current()->parent->sema_load));
-	printf("STARt_process after sema_load up  currthread:%s\n", thread_current()->name);
+//부모의sema값을 올려 준 뒤에 오는 곳. 이 sema_load는 부모가자식 실행전에  먼저 끝나는 것을 막으려고 잠궈놨던 것이다.
+//	printf("STARt_process after sema_load up  currthread:%s\n", thread_current()->name);
 		
 	if(!success){
 		flag_for_ct= true;

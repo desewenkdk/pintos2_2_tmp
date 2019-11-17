@@ -19,7 +19,9 @@ struct file *
 file_open (struct inode *inode) 
 {
   	struct file *file = calloc (1, sizeof *file);
-	printf("cur T : %s, inode : %s, file:%s\n",thread_current()->name, (inode == NULL)?"NULL":"NOT NULL", (file == NULL)?"NULL":"NOTNULL");
+
+//도대체 read-sync할때 inode때문인지 file alloc때문인지 확인차 
+//	printf("cur T : %s, inode : %s, file:%s\n",thread_current()->name, (inode == NULL)?"NULL":"NOT NULL", (file == NULL)?"NULL":"NOTNULL");
 	if (inode != NULL && file != NULL)
     {
       file->inode = inode;

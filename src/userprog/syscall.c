@@ -65,7 +65,7 @@ void syscall_init(void)
 
 static void syscall_handler (struct intr_frame *f UNUSED) 
 {
-    printf ("system call handler-----------------------------------!\n");
+    //printf ("system call handler-----------------------------------!\n");
 	uint32_t choose = 0;
 	choose = *(uint32_t *)(f->esp);
 	/*
@@ -84,7 +84,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 	}
 	
 	
-	printf("System call_NUM:%d\n\n",choose);
+	//printf("System call_NUM:%d\n\n",choose);
 	//hex_dump((f->esp), (f->esp), 100, 1);
 
 	/*is any bad pointer passes here??*/
@@ -116,20 +116,17 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 	else if (choose == SYS_EXEC) {
 	//	printf("system handler-SYS_EXEC");
 		//printf("\nSystem handler-SYS_EXEC---- argument:%p\n", *(uint32_t*)(f->esp + 4)); //�ּҰ��� �Ķ���ͷ� ���� �Լ��鿡 �����Ѵ�. esp�� ��ȿ���������� ����� �ּҰ��� invalid�� �� �ִ�.
-		printf("syn-readdddddddd\n");
 		if (!is_user_vaddr(f->esp + 4) || (pagedir_get_page(thread_current()->pagedir, (f->esp + 4)) == NULL)){
 	//		printf("111111111111111111111111111111\n");
 			exit(-1);
 		}
 		//for test case exec-bad-ptr -> ���ʿ��ѵ�.
 		else if (!is_user_vaddr(*(uint32_t*)(f->esp + 4)) || (pagedir_get_page(thread_current()->pagedir, (*(uint32_t*)(f->esp + 4))) == NULL)) {
-			//printf("\nToo low address for argument\n");
-	//		printf("222222222222222222222222222222\n");
+	
 			exit(-1);
 		}
 		else{
-			printf("syn-read %s\n",thread_current()->name);
-	//		printf("33333333333333333333333333333333\n");
+			
 			f->eax = exec((const char*)*(uint32_t*)(f->esp + 4));
 		}
 	}
@@ -172,7 +169,7 @@ static void syscall_handler (struct intr_frame *f UNUSED)
 		int fd = (int)*(uint32_t *)(f->esp + 4);
 		void* buffer = (void *)*(uint32_t *)(f->esp + 8);
 		uint32_t size = (uint32_t)*(uint32_t *)(f->esp + 12);
-		printf("readsyn %s\n", thread_current()->name);
+	//	printf("readsyn %s\n", thread_current()->name);
 		f->eax = write(fd, buffer, size);
 	}
 
@@ -273,7 +270,8 @@ void halt(void)
 
 pid_t exec(const char *cmd_line)
 {
-	printf("synread syscall.c exec calling %s\n",cmd_line);
+// 일단 exec함수는 부르는지 체크 : esp파라미터의 값이 잘못되어서 못 들어갈 수 도 있으니...
+//	printf("synread syscall.c exec calling %s\n",cmd_line);
 	return process_execute(cmd_line);
 }
 
@@ -312,6 +310,8 @@ int read(int fd, void *buffer, unsigned size) {
 		exit(-1);
 	}
 
+
+//	printf("syscall-read before lock_acquire cur_t: %s\n", thread_current()->name);
 	lock_acquire(&file_lock);
 /*
 		sema_down(&mutex);
@@ -321,6 +321,8 @@ int read(int fd, void *buffer, unsigned size) {
 		}
 		sema_up(&mutex);
 */	
+
+//	printf("syscall-read after lock_acquire, before lock_release cur_t : %s", thread_current()->name);
 	if(fd==0){ // standard input
 		for(i=0; i< size; i++)
 			*(uint8_t *) (buffer+i) = input_getc();
@@ -347,6 +349,8 @@ int read(int fd, void *buffer, unsigned size) {
 	}
 
 	lock_release(&file_lock);
+
+//	printf("syscall-read after lock_release cur_t : %s", thread_current()->name);
 /*
 	sema_down(&mutex);
 	readcount--;
@@ -380,7 +384,9 @@ int write(int fd, const void *buffer, unsigned size) {
 	//	    
 	//	}
 	//	printf("%u", *(uint8_t *)(buffer));
-		printf("syscall-write synread here? %s\n", thread_current()->name);
+    
+	// check fd=1로 들어오는 syscall : 실행파일인 경우 cmd입력으로 처리되어 종종일루 온다.
+	//		printf("syscall-write synread here? %s\n", thread_current()->name);
 		ret = size;
 	}
 
@@ -388,23 +394,23 @@ int write(int fd, const void *buffer, unsigned size) {
 	//check for access to NULL file pointer
 		struct thread *cur = thread_current();
 		if (cur->files[fd] == NULL){
-			printf("?????????? %s\n", thread_current()->name);
+			//printf("?????????? %s\n", thread_current()->name);
 			//sema_up(&wrt);
 			exit(-1);
 		}
 
 		//block to write when this file is being written
 		if(cur->files[fd]->deny_write){
-			printf("syscall-write deny???synread?? %s", thread_current()->name);
+		//	printf("syscall-write deny???synread?? %s", thread_current()->name);
 			file_deny_write(cur->files[fd]);
 		}		
 
-		int ret;
+		//int ret;
 		/*returns the number of bytes actually written, file.c*/
 		ret = file_write(cur->files[fd],buffer,size);
-		printf("syscall-write before semaup %s %d\n", cur->name, ret);
+//		printf("syscall-write before semaup %s %d\n", cur->name, ret);
 	//	sema_up(&wrt);
-		printf("syscall-write synread %s success?? write : %d\n", cur->name, ret);
+//		printf("syscall-write synread %s success?? write : %d\n", cur->name, ret);
 	//	return ret;
 	}
 	else{
@@ -412,6 +418,7 @@ int write(int fd, const void *buffer, unsigned size) {
 	}
 	lock_release(&file_lock);
 	//	sema_up(&wrt);	
+//	printf("%d\n",ret);
 	return ret;
 }
 
@@ -430,17 +437,18 @@ bool remove(const char *file){
 /*it must return "file descripter" value from created file -> index of files array*/
 int open(const char *file){
 	int i,return_fd = -1;
-	printf("syscall-open file : %s\n", file);
-	printf("syscall-open %s\n", thread_current()->name);
+	//printf("syscall-open file : %s\n", file);
+	//printf("syscall-open %s\n", thread_current()->name);
 	
 	if(file == NULL){
-		printf("in syscall-open file %s failed open, NULL t : %s", file, thread_current()->name);
+	//	printf("in syscall-open file %s failed open, NULL t : %s", file, thread_current()->name);
 		//exit(-1);
 		return_fd = -1;
 	}
 
 	vaddr_valid_checker(file);	
 
+	//acquire before fileopen.
 	lock_acquire(&file_lock);
 	struct file *fileopen = filesys_open(file);
 	struct thread *cur_t = thread_current();
@@ -459,7 +467,7 @@ int open(const char *file){
 
 	if (fileopen == NULL){
 		//must return open function....directly before locked.
-		printf("syscall-open fileopen NULL %s\n",thread_current()->name);
+	//	printf("syscall-open fileopen NULL %s\n",thread_current()->name);
 		return_fd = -1;
 	}
 	//iteration start with fd = 3; fd 0,1,2 is already defined for (STDIN_FILENO) , (STDOUT_FILENO), STDERR.
@@ -478,7 +486,8 @@ int open(const char *file){
 //check for filename and thread name for rox
 			//printf("%s %s\n", cur_t->name, file);
 			if (strcmp(thread_name(), file) == 0){
-				printf("syscall-open denied open %s\n",thread_current()->name);
+//file write deny처리가 안 되어있나 확인
+//				printf("syscall-open denied open %s\n",thread_current()->name);
 				file_deny_write(fileopen);
 //checking rox-child, is file in current thread is closed? 만약 그렇다면 NULL체크도 했어야 했다.
 				//printf("is denyed?? %s %s\n", cur_t->name, file);
@@ -543,7 +552,8 @@ void close(int fd){
 		//these tasks are executing in file_close function.
 		file_allow_write(cur->files[fd]);
 		//cur->files[fd] = NULL;
-		printf("syscall-close t:%s can write? %s\n" ,cur->name, cur->files[fd]->deny_write ? "false" : "true");
+		//닫기 전에 file deny처리 확인
+//		printf("syscall-close t:%s can write? %s\n" ,cur->name, cur->files[fd]->deny_write ? "false" : "true");
 
 
 //		printf("fd : %d", fd);

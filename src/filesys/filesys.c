@@ -71,22 +71,15 @@ filesys_create (const char *name, off_t initial_size)
 struct file *
 filesys_open (const char *name)
 {
-//	intr_disable();
-//	lock_acquire(& filelock);
-//	intr_enable();
 
-	printf("in filesys.c filesysopen, filename : %s\n", name);
+//open이 안되는 파일의 이름은?
+//	printf("in filesys.c filesysopen, filename : %s\n", name);
   struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
 
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
   dir_close (dir);
-
-//	intr_disable();
-//	lock_release(& filelock);
-//	intr_enable();
-
 
   return file_open (inode);
 }
