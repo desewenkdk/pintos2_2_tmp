@@ -73,6 +73,14 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+/* alarm-clock 
+make sleep list which make THREAD_BLOCK state until wake time comes
+*/
+struct list sleep_list;
+/* variable stores first-wake thread's wake time*/
+int64_t first_wake_tick;
+
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -95,11 +103,75 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
 
+	//initialize new list : sleep list
+	list_init(&sleep_list);
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+}
+
+bool wakeup_first_with_priority(struct list_elem *t1, struct list_elem *t2, void *noused UNUSED){
+	struct thread *comp_t1 = list_entry(t1, struct thread, elem);
+	struct thread *comp_t2 = list_entry(t2, struct thread, elem);
+
+	//compare waketime of two thread, if t1 is earlier, return true;
+	if(comp_t1->waketime < comp_t2->waketime){
+		return true;
+	}
+	/* we have to consider situation that two thread has "same wake-time!!" */
+	else if(comp_t1->waketime == comp_t2->waketime){
+		//then, we should compare priority of two thread
+		if(comp_t1->priority > comp_t2->priority){
+			return true;
+		}
+		else return false;
+	}
+	else{
+		return false;
+	}
+}
+
+/* make thread BLOCK state until wakeup tick comes*/
+void thread_make_sleep(int64_t tick){
+	struct thread *cur = thread_current();
+	ASSERT(cur != idle_thread);
+//    int64_t start = timer_ticks();
+	
+	//disable interrupt during putting to sleep
+	enum intr_level prev_lv; // before disable interrupt, save current interrupt level
+	prev_lv = intr_disable();
+
+	/*파라미터로 받아오는 tick값에 start+tick값을 넣어서 가져오자.*/
+	cur->waketime = tick;
+	//insert sleep thread, list will sorted by waketime.
+	list_insert_ordered(&sleep_list, &cur->elem, wakeup_first_with_priority, NULL);//list:sleeplist(넣고자 하는 리스트), list_elem:cur thread list_elem
+	thread_block();
+	intr_set_level(prev_lv);
+}
+
+/* wake thread when waketime comes..*/
+void thread_awake(int64_t cur_tick){
+	struct thread *tmp;
+	struct list_elem *e;
+
+	//find thread's' that waketime already done, and awake them all.
+	for(; e!=list_end(&sleep_list) && !list_empty(&sleep_list) ;){
+		//가장 빨리 일어나야 하는 쓰레드를 가져온다.
+		e = list_front(&sleep_list);
+		tmp = list_entry(e,struct thread, elem);
+		//일어날 시간이지났으면 일어나게 하고 sleep_list에서 제거한다.
+		if(tmp->waketime <= cur_tick){
+			list_pop_front(&sleep_list);
+			thread_unblock(tmp);
+		}
+		//가장 시간이 빠른 것 조차 아직 시간이 덜 되었으면 그 이후의 것들은 볼 필요도 없다.
+		else{
+			break; //tick이 작은 순으로 이미 정렬되어있으므로,뒤의것들은 볼 필요조차 없다.
+		}
+	}
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -324,7 +396,7 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
+  if (cur != idle_thread) //we have to modify considering priority
     list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
@@ -491,7 +563,6 @@ init_thread (struct thread *t, const char *name, int priority)
 	//initializing semaphores for threads(process)
   	sema_init(&(t->sema_lock), 0);
   	sema_init(&(t->sema_mem), 0);
-
 	/*semaphore to stay alive parent until child is successfully loaded*/
 	sema_init(&(t->sema_load), 0);
   //ls_child

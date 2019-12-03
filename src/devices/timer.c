@@ -30,6 +30,9 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/* store threads which get in sleep*/
+struct list sleep_list;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -84,16 +87,25 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+/*
+bool list_order_by_tick(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+	const struct thread comp1 = list_entry();
+	
+}*/
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  	int64_t start = timer_ticks(); 
+  	ASSERT (intr_get_level () == INTR_ON);
+  	//while (timer_elapsed (start) < ticks) 
+  	//  thread_yield ();
+	
+	//implement sleep-wake
+	thread_make_sleep(start + ticks);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -170,7 +182,10 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
-  ticks++;
+ ticks++;
+
+	//implement thread_awakening
+	thread_awake(ticks);
   thread_tick ();
 }
 
