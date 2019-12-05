@@ -108,6 +108,7 @@ thread_init (void)
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
+	//set priority default
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
@@ -287,9 +288,13 @@ thread_create (const char *name, int priority,
 
   //connect child thread with parent thread
   
-  
   thread_unblock (t);
 
+	//새로 생성하는 thread의 priority가 수행되고 있는 thread의 것보다 크다면? -> 새로 생성된 thread가 readylist의 맨 앞에 가도록 re-schedule해주어야 한다.
+	//스케쥴링이 똑바로 되었다면 항상 수행되고 있는 thread의 priority가 가장 큰 값일 것이다.
+	if (priority > thread_current()->priority){
+		thread_yield();//단순히 schedule만호출할것이 아니라 cpu양도까지 하도록 한다.
+	}	
   return tid;
 }
 
@@ -326,9 +331,11 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
-  t->status = THREAD_READY;
-  intr_set_level (old_level);
+  //list_push_back (&ready_list, &t->elem);
+  	/* we should change here that considering Priority of thread*/
+	list_insert_ordered(&ready_list, &t->elem, thread_comp_priority, NULL);
+	t->status = THREAD_READY;
+  	intr_set_level (old_level);
 }
 
 /* Returns the name of the running thread. */
@@ -380,9 +387,9 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current()->allelem);
-  thread_current ()->status = THREAD_DYING;
-  schedule ();
-  NOT_REACHED ();
+  thread_current ()->status = THREAD_DYING; 
+  schedule();
+	NOT_REACHED ();
 }
 
 /* Yields the CPU.  The current thread is not put to sleep and
@@ -396,10 +403,13 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) //we have to modify considering priority
-    list_push_back (&ready_list, &cur->elem);
+  	if (cur != idle_thread) {//we have to modify considering priority{
+		//list_push_back (&ready_list, &cur->elem);
+		list_insert_ordered(&ready_list, &cur->elem, thread_comp_priority, 0);
+	}
   cur->status = THREAD_READY;
   schedule ();
+//	thread_yield();
   intr_set_level (old_level);
 }
 
@@ -424,7 +434,10 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+     thread_current ()->priority = new_priority;
+	 //만약 새로 설정된 priority값이 기존에 가장 큰 priority = 지금 실행중인 thread의 priority보다 크다면 cpu를 양도받자.
+//	if(thread_current()->priority < new_priority)
+		thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -432,6 +445,15 @@ int
 thread_get_priority (void) 
 {
   return thread_current ()->priority;
+}
+
+/* compare priority of two threads */
+bool thread_comp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+	struct thread *t1, *t2;
+	t1 = list_entry(a,struct thread, elem);
+	t2 = list_entry(b,struct thread, elem);
+	//true if t1 > t2
+	return t1->priority >= t2->priority;
 }
 
 /* Sets the current thread's nice value to NICE. */

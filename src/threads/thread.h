@@ -160,6 +160,7 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
@@ -169,5 +170,8 @@ int thread_get_load_avg (void);
 bool wakeup_first_with_priority(struct list_elem *t1, struct list_elem *t2, void *unuse UNUSED);
 void thread_make_sleep(int64_t tick);
 void thread_awake(int64_t cur_tick);
+
+//add for thread priority compare
+bool thread_comp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 #endif
 /* threads/thread.h */
