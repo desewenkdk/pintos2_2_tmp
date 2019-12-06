@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "synch.h"
 /* States in a thread's life cycle. */
+
 enum thread_status
   {
     THREAD_RUNNING,     /* Running thread. */
@@ -127,12 +128,18 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-  };
+
+	/* use for impelement priority aging, BSD scheduler*/
+	int recent_cpu;
+	int nice;
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+extern bool thread_prior_aging;
+
 
 void thread_init (void);
 void thread_start (void);
@@ -174,5 +181,17 @@ void thread_awake(int64_t cur_tick);
 //add for thread priority compare
 bool thread_comp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 void reschedule_thread_by_priority(void);
+
+/* doing priority aging...*/
+void thread_aging(void);
+
+int thread_get_nice(void);
+void thread_set_nice(int new_nice);
+int thread_get_recent_cpu(void);//returns 100times the curr-thread's recent value, rounded up to int
+int thread_get_load_avg(void);//returns 100times the the current system load average, rounded to int
+
+int get_max_priority(void);//implement for ease
+void cal_recent_cpu_and_load_avg(void);
+void cal_priority_using_aging(void);
 #endif
 /* threads/thread.h */

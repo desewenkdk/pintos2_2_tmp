@@ -16,6 +16,7 @@
 #include "userprog/process.h"
 
 #endif
+#include "threads/float_fixedpoint.c"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -80,6 +81,11 @@ struct list sleep_list;
 /* variable stores first-wake thread's wake time*/
 int64_t first_wake_tick;
 
+/* flag for aging */
+bool thread_prior_aging;
+
+/* load_avg value*/
+int load_avg;
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -106,12 +112,21 @@ thread_init (void)
 	//initialize new list : sleep list
 	list_init(&sleep_list);
 
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
 	//set priority default
+
+	/*set load_avg*/
+	load_avg = 0;  
   init_thread (initial_thread, "main", PRI_DEFAULT);
+
+  /*initialize thread's properties*/
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  initial_thread->recent_cpu = 0;
+  initial_thread->nice = 0;
 }
 
 bool wakeup_first_with_priority(struct list_elem *t1, struct list_elem *t2, void *noused UNUSED){
@@ -133,6 +148,11 @@ bool wakeup_first_with_priority(struct list_elem *t1, struct list_elem *t2, void
 	else{
 		return false;
 	}
+}
+
+void thread_aging(){
+	/* performs priority aging technique */
+	
 }
 
 /* make thread BLOCK state until wakeup tick comes*/
@@ -209,9 +229,13 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  /* Enforce preemption. */
+  /* Enforce preemption. : interrupt가 올 수 있으므로 그냥 yield대신이거쓴단다.*/
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+
+	/* Implementation for using Aging flag....*/
+	if (thread_prior_aging == true)
+		thread_aging();
 }
 
 /* Prints thread statistics. */
@@ -589,6 +613,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
   t->parent = running_thread();
+
+  /* proj3. nice값과 recent_cpu값을 현재 running thread로부터 인계받자.*/
+	t->recent_cpu = running_thread()->recent_cpu;
+    t->nice = running_thread()->recent_cpu;
 #ifdef USERPROG
 	int i;//initialize file structures to NULL
 	for(i=0; i<128; i++){
