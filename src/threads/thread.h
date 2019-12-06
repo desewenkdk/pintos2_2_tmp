@@ -173,5 +173,6 @@ void thread_awake(int64_t cur_tick);
 
 //add for thread priority compare
 bool thread_comp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+void reschedule_thread_by_priority(void);
 #endif
 /* threads/thread.h */

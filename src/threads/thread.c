@@ -292,10 +292,10 @@ thread_create (const char *name, int priority,
 
 	//새로 생성하는 thread의 priority가 수행되고 있는 thread의 것보다 크다면? -> 새로 생성된 thread가 readylist의 맨 앞에 가도록 re-schedule해주어야 한다.
 	//스케쥴링이 똑바로 되었다면 항상 수행되고 있는 thread의 priority가 가장 큰 값일 것이다.
-/*	if (priority > thread_current()->priority){
+	if (priority > thread_current()->priority){
 		thread_yield();//단순히 schedule만호출할것이 아니라 cpu양도까지 하도록 한다.
-	}	*/
-  reschedule_thread_by_priority();
+	}	
+  //reschedule_thread_by_priority();
   return tid;
 }
 
@@ -338,7 +338,8 @@ thread_unblock (struct thread *t)
 	t->status = THREAD_READY;
  // 	intr_set_level (old_level);
 
-	reschedule_thread_by_priority();
+	//do not re-schedule in here!!! 
+	//reschedule_thread_by_priority();
 
   	intr_set_level (old_level);
 }
@@ -444,9 +445,10 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+	//int cur_priority = thread_current()->priority;
      thread_current ()->priority = new_priority;
-	 //만약 새로 설정된 priority값이 기존에 가장 큰 priority = 지금 실행중인 thread의 priority보다 크다면 cpu를 양도받자.
-//	if(thread_current()->priority < new_priority)
+
+	//if(cur_priority < new_priority && thread_current ()!= idle_thread)	
 		thread_yield();
     // reschedule_thread_by_priority();	
 }
