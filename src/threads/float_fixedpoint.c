@@ -15,8 +15,8 @@ load_avg : average of the number of thread in READY state, initial:0
 ready_threads : number of thread in READY or RUNNING state 
 (Except for idle thread)
 */
-
-#define BIT_SHIFT_FOR_F 14
+#include "threads/float_fixedpoint.h"
+#define BIT_SHIFT_FOR_F (1<<14)
 
 //same as integer arithmatic
 int R_mul_I(int R, int I){
@@ -38,30 +38,30 @@ int R_sub_R(int R1, int R2){
 //have to do shift operation(doing mult or div by 2^14) after calculation
 //because we have to consider of "fraction" part.
 int R_add_I(int R, int I){
-	int c = I << BIT_SHIFT_FOR_F;
+	int c = I * BIT_SHIFT_FOR_F;
 	return R + c;
 }
 
 int R_sub_I(int R, int I){
-	int c = I << BIT_SHIFT_FOR_F;
-	return R - I;
+	int c = I * BIT_SHIFT_FOR_F;
+	return R - c;
 }
 
 int I_sub_R(int I, int R){
-	int c = I << BIT_SHIFT_FOR_F;
-	return I - R;
+	int c = I * BIT_SHIFT_FOR_F;
+	return c - R;
 }
 
 int R_mul_R(int r1, int r2){
 	int64_t rt = r1;//prevent overflow...
 	rt = rt * r2;
-	rt = rt >> BIT_SHIFT_FOR_F;
+	rt = rt / BIT_SHIFT_FOR_F;
 	return (int)rt;
 }
 
 int R_div_R(int r1, int r2){
 	int64_t rt = r1; //prevent overflow..
-	rt = rt << BIT_SHIFT_FOR_F;
+	rt = rt * BIT_SHIFT_FOR_F;
 	rt = rt / r2;
 	return (int)rt;	
 }

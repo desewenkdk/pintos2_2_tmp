@@ -183,7 +183,7 @@ void thread_make_sleep(int64_t tick){
 	/*파라미터로 받아오는 tick값에 start+tick값을 넣어서 가져오자.*/
 	cur->waketime = tick;
 	//insert sleep thread, list will sorted by waketime.
-	list_insert_ordered(&sleep_list, &cur->elem, wakeup_first_with_priority, NULL);//list:sleeplist(넣고자 하는 리스트), list_elem:cur thread list_elem
+	list_insert_ordered(&sleep_list, &cur->elem, wakeup_first_with_priority, 0);//list:sleeplist(넣고자 하는 리스트), list_elem:cur thread list_elem
 	thread_block();
 	intr_set_level(prev_lv);
 }
@@ -480,12 +480,22 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+bool is_idle_thread(struct thread *t){
+	if (t == idle_thread) return true;
+	else return false;
+}
+
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
 {
 	//int cur_priority = thread_current()->priority;
      thread_current ()->priority = new_priority;
+
+	if (thread_mlfqs == true){
+		return;
+	}
 
 	//if(cur_priority < new_priority && thread_current ()!= idle_thread)	
 		thread_yield();
@@ -523,8 +533,10 @@ void cal_recent_cpu_and_load_avg(){
 	tmp = R_div_I(tmp, 60);
 	load_avg = tmp;
 
+//	printf("in cal_recent_cpu_sdfdf LOAD_AVG : %d\n",load_avg);
 	//모든 thread들을 돌면서 recent_cpu값들을 갱신해준다. idle_thread뺴고.
-	for(e = list_begin(&all_list) ; e!=list_end(&all_list) ; e=list_next(&all_list)){
+	
+	for(e = list_begin(&all_list) ; e!=list_end(&all_list) ; e=list_next(e)){
 		travel = list_entry(e,struct thread, allelem);
 		if(travel == idle_thread) continue;
 		else{
@@ -540,13 +552,14 @@ void cal_recent_cpu_and_load_avg(){
 void cal_priority_using_aging(){
 	struct list_elem *e;
 	struct thread *travel;
+	int tmp, niceT2;
 	
-	for (e = list_begin(&all_list);e!=list_end(&all_list);e=list_next(&all_list)){
+	for (e = list_begin(&all_list);e!=list_end(&all_list);e=list_next(e)){
 		travel = list_entry(e,struct thread, allelem);
 		if (travel == idle_thread) continue;
 		else{
-			int tmp = R_div_I(travel->recent_cpu, 4);
-			int niceT2 = travel->nice * 2;
+			tmp = R_div_I(travel->recent_cpu, 4);
+			niceT2 = travel->nice * 2;
 			travel->priority = I_sub_R(R_add_I(0,PRI_MAX),tmp);
 			travel->priority = R_sub_R(travel->priority,niceT2);
 			
@@ -568,6 +581,8 @@ thread_set_nice (int nice UNUSED)
 {
   /* Not yet implemented. */
 	thread_current()->nice = nice;
+	cal_recent_cpu_and_load_avg();
+	cal_priority_using_aging();
 }
 
 /* Returns the current thread's nice value. */
@@ -583,7 +598,7 @@ int
 thread_get_load_avg (void) 
 {
   /* Not yet implemented. */
- return (R_mul_I(load_avg,100) >> BIT_SHIFT_FOR_F);
+ return (R_mul_I(load_avg,100)/(1<<14));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -591,7 +606,7 @@ int
 thread_get_recent_cpu (void) 
 {
   /* Not yet implemented. */
-  return (R_mul_I(thread_current()->recent_cpu,100) >> BIT_SHIFT_FOR_F);
+  return (R_mul_I(thread_current()->recent_cpu,100)/(1<<14));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
