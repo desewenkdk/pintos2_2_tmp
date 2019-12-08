@@ -192,6 +192,9 @@ int thread_get_load_avg(void);//returns 100times the the current system load ave
 
 int get_max_priority(void);//implement for ease
 void cal_recent_cpu_and_load_avg(void);
+
+void cal_recent_cpu(void);
+void cal_load_avg(void);
 void cal_priority_using_aging(void);
 bool is_idle_thread(struct thread *t);
 #endif

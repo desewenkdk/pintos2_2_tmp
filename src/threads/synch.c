@@ -118,12 +118,13 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)){ 
-    	thread_unblock (list_entry (list_pop_front (&sema->waiters),                      struct thread, elem));
-/*		e = list_begin(&sema->waiters);
+    	//thread_unblock (list_entry (list_pop_front (&sema->waiters),struct thread, elem));
+		e = list_begin(&sema->waiters);
 		highest_e = e;
 		highest_t = list_entry(e, struct thread, elem); // to compare, get first thread instance from sema->waiters list, higiest priority thread initialize 
 		for(e = list_next(e);e!=list_end(&sema->waiters);e = list_next(e)){
 			tmp = list_entry(e,struct thread, elem);
+			if (is_idle_thread(tmp)) continue;
 			if (tmp->priority > highest_t->priority){
 				highest_t = tmp;
 				highest_e = e;
@@ -133,7 +134,7 @@ sema_up (struct semaphore *sema)
 		list_remove(highest_e);
 		
 		//unblock thread before - sema_up
-		thread_unblock(highest_t);*/
+		thread_unblock(highest_t);
 	}
   sema->value++;
   intr_set_level (old_level);

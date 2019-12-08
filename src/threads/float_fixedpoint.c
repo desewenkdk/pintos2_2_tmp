@@ -35,8 +35,7 @@ int R_sub_R(int R1, int R2){
 	return R1 - R2;
 }
 
-//have to do shift operation(doing mult or div by 2^14) after calculation
-//because we have to consider of "fraction" part.
+//have to consider fixed-point fraction bits(doing mult or div by 2^14) after calculation
 int R_add_I(int R, int I){
 	int c = I * BIT_SHIFT_FOR_F;
 	return R + c;

@@ -490,14 +490,14 @@ bool is_idle_thread(struct thread *t){
 void
 thread_set_priority (int new_priority) 
 {
-	//int cur_priority = thread_current()->priority;
+	 int cur_priority = thread_current()->priority;
      thread_current ()->priority = new_priority;
 
 	if (thread_mlfqs == true){
 		return;
 	}
 
-	//if(cur_priority < new_priority && thread_current ()!= idle_thread)	
+	if(new_priority < cur_priority && thread_current ()!= idle_thread)	
 		thread_yield();
     // reschedule_thread_by_priority();	
 }
@@ -521,9 +521,8 @@ bool thread_comp_priority(const struct list_elem *a, const struct list_elem *b, 
 //calculated repeatadly every 1 ticks..
 void cal_recent_cpu_and_load_avg(){
 	int ready_threads = list_size(&ready_list);
-	struct list_elem *e;
 	struct thread *travel;
-
+	struct list_elem *e;
 	if (thread_current() != idle_thread)
 		ready_threads +=1;
 
@@ -549,20 +548,55 @@ void cal_recent_cpu_and_load_avg(){
 	}
 }
 
+void cal_recent_cpu(){
+	struct list_elem *e;
+	struct thread *traverse;
+	int tmp = 0;
+	for(e = list_begin(&all_list) ; e!=list_end(&all_list) ; e=list_next(e)){
+		traverse = list_entry(e,struct thread, allelem);
+		if(traverse == idle_thread) continue;
+		else{
+			tmp = R_mul_I(load_avg, 2);
+			tmp = R_div_R(tmp, R_add_I(tmp, 1));
+			tmp = R_mul_R(tmp, traverse->recent_cpu);
+			tmp = R_add_I(tmp, traverse->nice);
+			traverse->recent_cpu = tmp;
+		}
+	}
+
+}
+
+void cal_load_avg(){
+	int num_ready_threads = list_size(&ready_list);
+	struct thread *travel;
+
+	if (thread_current() != idle_thread)
+		num_ready_threads +=1;
+
+	//곱셈공식을 사용. a*c + b*c = c * (a + b) int/int를방지하기 위함.
+	int tmp = R_mul_I(load_avg, 59);
+	tmp = R_add_I(tmp, num_ready_threads);
+	tmp = R_div_I(tmp, 60);
+	load_avg = tmp;
+
+}
+
 void cal_priority_using_aging(){
 	struct list_elem *e;
 	struct thread *travel;
-	int tmp, niceT2;
+	int Rdiv4, niceT2, pMr, rMi;
 	
 	for (e = list_begin(&all_list);e!=list_end(&all_list);e=list_next(e)){
 		travel = list_entry(e,struct thread, allelem);
 		if (travel == idle_thread) continue;
 		else{
-			tmp = R_div_I(travel->recent_cpu, 4);
+			Rdiv4 = R_div_I(travel->recent_cpu, 4);
 			niceT2 = travel->nice * 2;
-			travel->priority = I_sub_R(R_add_I(0,PRI_MAX),tmp);
-			travel->priority = R_sub_R(travel->priority,niceT2);
 			
+			pMr = I_sub_R(PRI_MAX,Rdiv4);
+			rMi = R_sub_I(pMr,niceT2);
+		    travel->priority = rMi;
+	
 		    if (travel->priority > PRI_MAX) {
 			      travel->priority = PRI_MAX;
     		}
@@ -573,16 +607,22 @@ void cal_priority_using_aging(){
 	}
 	//re-sort ready list by updated priority
 	list_sort(&ready_list,thread_comp_priority,NULL);
+	if(thread_current()->priority < get_max_priority()){
+		intr_yield_on_return();
+	}	
 }
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
   /* Not yet implemented. */
 	thread_current()->nice = nice;
-	cal_recent_cpu_and_load_avg();
+	cal_recent_cpu();
 	cal_priority_using_aging();
+
+	if (thread_current()->priority < get_max_priority())
+		thread_yield();
 }
 
 /* Returns the current thread's nice value. */
@@ -701,7 +741,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   /* proj3. nice값과 recent_cpu값을 현재 running thread로부터 인계받자.*/
 	t->recent_cpu = running_thread()->recent_cpu;
-    t->nice = running_thread()->recent_cpu;
+    t->nice = running_thread()->nice;
 #ifdef USERPROG
 	int i;//initialize file structures to NULL
 	for(i=0; i<128; i++){
@@ -832,6 +872,18 @@ allocate_tid (void)
   lock_release (&tid_lock);
 
   return tid;
+}
+
+int get_max_priority(void){
+	struct thread *t;
+	struct list_elem *e;
+
+    int max = -1;
+	if (!list_empty(&ready_list)){
+		t = list_entry(list_front(&ready_list),struct thread, elem);
+		max = t->priority;
+	}
+	return max;
 }
 
 /* Offset of `stack' member within `struct thread'.

@@ -195,7 +195,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
             t->recent_cpu = R_add_I(t->recent_cpu, 1);
         
 		if(timer_ticks()!=0 && timer_ticks() % TIMER_FREQ == 0){
-            cal_recent_cpu_and_load_avg();
+            cal_recent_cpu_and_load_avg();//may be seperate...
         }
 
 
